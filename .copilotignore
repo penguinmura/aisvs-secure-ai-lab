@@ -1,0 +1,13 @@
+# シークレット・資格情報
+secrets/
+*.pem
+*.key
+.env*
+
+# テスト用フィクスチャデータ（ダミーキーや機密モックデータ含む）
+test/fixtures/
+tests/fixtures/
+spec/fixtures/
+
+# CI/CDの高度な秘密情報サンプル
+.github/secrets/
