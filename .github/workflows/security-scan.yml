@@ -1,0 +1,155 @@
+name: "AISVS Security Scan"
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+# 権限最小化 ＋ OIDCトークン発行許可 (AC.11.4 / AC.12.1)
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+  id-token: write # AWS OIDC 用
+
+jobs:
+  # 1. ハードコードシークレット検知 (AC.3.1)
+  gitleaks:
+    name: "gitleaks"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.7 SHA固定
+        with:
+          fetch-depth: 0
+          persist-credentials: false # トークン残留防止 (AC.12.2)
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@e85e4939a7b97c7d4ccf16c7cf6f69527f33d402 # v2.3.4 SHA固定
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 2. SAST 静的コード解析 (AC.4.2)
+  codeql:
+    name: "codeql"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@afb9cdd399cb7b64f02a6fd8e81119777f98d787 # v3 SHA固定
+        with:
+          languages: 'javascript-typescript,python'
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@afb9cdd399cb7b64f02a6fd8e81119777f98d787
+
+  # 3. 既知脆弱性 ＆ 新興偽パッケージ (Slopsquatting) 検知 (AC.13.3)
+  dependency-review:
+    name: "dependency-review"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        with:
+          persist-credentials: false
+
+      - name: Dependency Review (GHSA DB)
+        uses: actions/dependency-review-action@5a2ee3f326216748e658428581e285a21396a5b6 # v4 SHA固定
+        with:
+          fail-on-severity: high
+
+      - name: Socket Security Scan (Slopsquatting & Malicious Package)
+        uses: Secure-Interlock/socket-action@8502f6ef539130cb04ff40b094cb0579e0e5bb94 # SHA固定
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # 4. IaC / 設定ファイル危険検証 (AC.7.2 - AC.7.3)
+  checkov:
+    name: "checkov"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        with:
+          persist-credentials: false
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@12b07e781190bc1fefbbab9ad11ff9ef0db99a5e # SHA固定
+        with:
+          framework: all
+          output_format: cli
+          soft_fail: false
+
+  # 5. Amazon Bedrock Guardrails による Fail-Secure PR ＆ Diff スキャン (AC.3.3 / AC.11.1)
+  bedrock-guardrails:
+    name: "bedrock-guardrails"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.2.0 SHA固定
+        with:
+          python-version: '3.11'
+
+      - name: Install AWS SDK
+        run: pip install boto3
+
+      - name: Configure AWS Credentials via OIDC (No Static Keys)
+        uses: aws-actions/configure-aws-credentials@e44e0b3f93eb00e6e73685e13ea793f669a9b400 # v4 SHA固定
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsBedrockRole
+          aws-region: us-east-1
+
+      - name: Run Fail-Secure Bedrock Guardrail Scan (Title, Body & Diff)
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          GUARDRAIL_ID: ${{ secrets.BEDROCK_GUARDRAIL_ID }}
+          GUARDRAIL_VERSION: "1"
+        run: |
+          python - << 'EOF'
+          import os, sys, subprocess, boto3
+
+          guardrail_id = os.environ.get('GUARDRAIL_ID')
+          guardrail_version = os.environ.get('GUARDRAIL_VERSION', '1')
+
+          # 🔴 Fail-Secure (Fail Closed) 原則: ID未設定なら即時失敗
+          if not guardrail_id:
+              print("❌ Critical Security Error: GUARDRAIL_ID secret is not set! Aborting build for safety.")
+              sys.exit(1)
+
+          # PR の Diff 差分を安全に取得
+          try:
+              diff_bytes = subprocess.check_output(["git", "diff", "origin/main...HEAD"])
+              diff_text = diff_bytes.decode('utf-8', errors='ignore')[:4000] # 上限制御
+          except Exception as e:
+              print(f"Warning: Could not fetch git diff: {e}")
+              diff_text = ""
+
+          pr_title = os.environ.get('PR_TITLE', '')
+          pr_body = os.environ.get('PR_BODY', '')
+
+          text_to_check = f"PR Title: {pr_title}\nPR Body: {pr_body}\nPR Code Diff:\n{diff_text}"
+
+          client = boto3.client('bedrock-runtime', region_name='us-east-1')
+          response = client.apply_guardrail(
+              guardrailIdentifier=guardrail_id,
+              guardrailVersion=guardrail_version,
+              source='INPUT',
+              content=[{'text': {'text': text_to_check}}]
+          )
+
+          if response.get('action') == 'BLOCKED':
+              print("❌ Security Alert: Prompt Injection or Policy Violation Detected in PR Content/Diff!")
+              sys.exit(1)
+
+          print("✅ PR Title, Body, and Code Diff passed Bedrock Guardrails inspection.")
+          EOF

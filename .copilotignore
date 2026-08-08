@@ -3,6 +3,7 @@ secrets/
 *.pem
 *.key
 .env*
+config/api_keys.*
 
 # テスト用フィクスチャデータ（ダミーキーや機密モックデータ含む）
 test/fixtures/
