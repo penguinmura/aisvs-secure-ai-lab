@@ -1,0 +1,28 @@
+name: "AI不適切・危険提案レポート"
+description: "GitHub Copilot 等のAIツールによる危険なコード提案や誤動作を報告します"
+title: "[AI Security] "
+labels: ["ai-security", "triage"]
+body:
+  - type: textarea
+    id: prompt_context
+    attributes:
+      label: "入力したプロンプト / コンテキスト"
+      description: "どのような指示やコンテキストを入力したか記述してください"
+    validations:
+      required: true
+  - type: textarea
+    id: ai_output
+    attributes:
+      label: "AIの不適切提案・出力内容"
+      description: "不適切・危険と判断したコードや出力を貼り付けてください"
+    validations:
+      required: true
+  - type: dropdown
+    id: risk_category
+    attributes:
+      label: "リスクカテゴリ"
+      options:
+        - "ハードコードシークレット提案"
+        - "脆弱なコード（SQLi, XSS等）の生成"
+        - "存在しない依存パッケージの提案（Slopsquatting）"
+        - "その他プロンプトインジェクション等"

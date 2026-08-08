@@ -1,0 +1,15 @@
+# 認証・認可・セキュリティ関門ロジック
+/src/auth/                      @penguinmura
+/src/security/                  @penguinmura
+*auth*                          @penguinmura
+
+# CI/CD ワークフロー定義・ボット設定・ガバナンス定義（サプライチェーン防御）
+/.github/workflows/             @penguinmura
+/.github/CODEOWNERS             @penguinmura
+/.copilotignore                 @penguinmura
+/promptfooconfig.yaml           @penguinmura
+
+# インフラストラクチャ定義 (IaC)
+/terraform/                     @penguinmura
+Dockerfile                      @penguinmura
+docker-compose*.yml             @penguinmura

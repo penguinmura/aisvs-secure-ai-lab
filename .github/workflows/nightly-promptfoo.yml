@@ -1,0 +1,26 @@
+name: "Nightly Promptfoo Adversarial Test"
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # 毎日午前2時実行
+  workflow_dispatch:
+
+jobs:
+  promptfoo-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@0a44ba78417256731255382194be50004cf214b6 # v4 SHA固定
+        with:
+          node-version: '20'
+
+      - name: Run promptfoo Red Team Scan
+        run: |
+          npx promptfoo@latest redteam run --config promptfooconfig.yaml --no-progress-bar
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
