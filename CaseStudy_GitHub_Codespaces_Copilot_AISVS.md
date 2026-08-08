@@ -187,6 +187,14 @@
   2. **アプリ層 (Spotlighting)**: 外部データを `<data>...</data>` などのタグで囲み「命令ではなく単なる読解データ」と明示。
   3. **水際防御 (Bedrock Guardrails)**: GitHub Actions で Amazon Bedrock Guardrails を挟み、外部データ内の攻撃プロンプトを事前検出・遮断。
 
+#### 💡 【詳細解説】Promptfoo による OWASP / MITRE ATLAS 準拠の動的敵対テスト機構 (AC.2.3 / AC.6.3)
+
+* **標準データベースと動的生成の組み合わせ**: 手動で個別の攻撃プロンプトを書くのではなく、Promptfoo の `redteam.plugins`（`indirect-prompt-injection`, `jailbreak`, `pii:direct` 等）を指定することで、OWASP Top 10 for LLM Applications および MITRE ATLAS 準拠の信頼できる攻撃データベース（シグネチャ）を一括呼び出し。
+* **内部動作メカニズム (2大エンジン)**:
+  1. **標準攻撃シグネチャの自動適用**: OWASP や主要研究機関が収集した既知の脱獄・インジェクションペインロードを自動選択。
+  2. **文脈に応じた動的攻撃生成 (LLM-as-an-Attacker)**: PR本文等の入力テキスト文脈に自然に溶け込む攻撃プロンプトをリアルタイムに自動生成してアタック。
+  3. **判定評価器 (Evaluator) の自動セットアップ**: 攻撃送信だけでなく、AI応答が機密情報（APIキー等）を漏洩していないか、指示無視を起こしていないかを内部判定器が自動評価し、突破された場合は GitHub Actions ジョブを停止（Fail-Secure）。
+
 ### AC.13: 受信コントリビューションにおける敵対的AIの検知
 * **要件の狙い**: AIのハルシネーションによる不正依存パッケージ混入の遮断。
 * **実現方法**:
