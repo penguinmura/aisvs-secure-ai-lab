@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
 
@@ -24,6 +24,6 @@ jobs:
           echo "Release Build v1.0.0" > dist/app.bin
 
       - name: Generate Artifact Attestation (SLSA Provenance)
-        uses: actions/attest-build-provenance@1c608d11969870c2a557c6696b9ef25624ebc0a6 # v1 SHA固定
+        uses: actions/attest-build-provenance@v1
         with:
           subject-path: 'dist/app.bin'
