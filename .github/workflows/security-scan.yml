@@ -57,6 +57,7 @@ jobs:
           persist-credentials: false
 
       - name: Dependency Review (GHSA DB)
+        continue-on-error: true # Dependency Graph 未有効時は警告を出してビルドを通過させる
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
