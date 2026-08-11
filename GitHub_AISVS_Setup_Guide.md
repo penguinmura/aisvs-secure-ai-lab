@@ -92,7 +92,7 @@ docker-compose*.yml             @my-org/sec-team @my-org/devops-team
 ```
 
 ### 1.4 AI 通報用 Issue テンプレートの配置（フィードバック追跡: AC.6.1）
-AI の危険な提案を通報・起票できるテンプレートを設置します。
+AI の危険な提案を通報・起票できるテンプレートを設置します。フィードバックは、「.copilotignore」「copilot-instructions.md」「CIの静的解析ルール」「promptfooconfig.yaml」などのガードレールを育てるために使います。
 
 **ファイルパス: `.github/ISSUE_TEMPLATE/ai-security-report.yml`**
 ```yaml
