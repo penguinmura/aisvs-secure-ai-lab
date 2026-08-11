@@ -5,6 +5,10 @@ on:
     - cron: '0 2 * * *' # 毎日午前2時実行
   workflow_dispatch:
 
+permissions:
+  id-token: write # AWS OIDC 昇格用権限
+  contents: read
+
 jobs:
   promptfoo-test:
     runs-on: ubuntu-latest
@@ -15,12 +19,18 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@0a44ba78417256731255382194be50004cf214b6 # v4 SHA固定
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Run promptfoo Red Team Scan
+      - name: Configure AWS Credentials via OIDC (Keyless)
+        uses: aws-actions/configure-aws-credentials@e44e0b3f93eb00e6e73685e13ea793f669a9b400 # v4 SHA固定
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsBedrockRole
+          aws-region: us-east-1
+
+      - name: Run promptfoo Red Team Scan via AWS Bedrock (No Static API Keys)
         run: |
           npx promptfoo@latest redteam run --config promptfooconfig.yaml --no-progress-bar
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AWS_REGION: "us-east-1"

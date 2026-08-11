@@ -354,6 +354,8 @@ jobs:
 
 ### 3.3 ナイトリー動的敵対的テスト `.github/workflows/nightly-promptfoo.yml` (AC.2.3 / AC.6.3)
 
+> 💡 **こだわりのポイント**: 外部に平文の API キー (`OPENAI_API_KEY`) を保持・手渡しせず、**AWS OIDC (IAM Role 昇格)** 経由で Amazon Bedrock 上の同等類似モデル (Claude 3.5 Sonnet 等) を呼び出して、キーレスで安全に自社プロンプト指示の受動・能動的テストを毎夜実行します。
+
 **ファイルパス: `.github/workflows/nightly-promptfoo.yml`**
 ```yaml
 name: "Nightly Promptfoo Adversarial Test"
@@ -362,6 +364,10 @@ on:
   schedule:
     - cron: '0 2 * * *' # 毎日午前2時実行
   workflow_dispatch:
+
+permissions:
+  id-token: write # AWS OIDC 昇格用権限
+  contents: read
 
 jobs:
   promptfoo-test:
@@ -377,11 +383,17 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Run promptfoo Red Team Scan
+      - name: Configure AWS Credentials via OIDC (Keyless)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsBedrockRole
+          aws-region: us-east-1
+
+      - name: Run promptfoo Red Team Scan via AWS Bedrock (No Static API Keys)
         run: |
-          npx promptfoo@latest redteam run --no-progress-bar
+          npx promptfoo@latest redteam run --config promptfooconfig.yaml --no-progress-bar
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AWS_REGION: "us-east-1"
 ```
 
 ---

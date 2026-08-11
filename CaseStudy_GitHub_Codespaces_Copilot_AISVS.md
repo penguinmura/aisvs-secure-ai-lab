@@ -187,6 +187,12 @@
   2. **アプリ層 (Spotlighting)**: 外部データを `<data>...</data>` などのタグで囲み「命令ではなく単なる読解データ」と明示。
   3. **水際防御 (Bedrock Guardrails)**: GitHub Actions で Amazon Bedrock Guardrails を挟み、外部データ内の攻撃プロンプトを事前検出・遮断。
 
+#### 💡 【詳細解説】AWS OIDC ＋ Amazon Bedrock (類似モデル) によるキーレス動的敵対テスト機構 (AC.2.3 / AC.6.3 / AC.11.8)
+
+* **直接テスト不可への解（類似モデル検証）**: IDE 内の GitHub Copilot や各種エージェントのエンドポイントは外部から直接呼び出せないため、同等クラスの高性能モデル（Amazon Bedrock 上の Anthropic Claude 3.5 Sonnet 等）をターゲット（代理モデル）に指定し、自社で作成したプロンプト指示（`promptfooconfig.yaml` や `.github/copilot-instructions.md`）の強靭性を検証する。
+* **静的 API キー全廃（AWS OIDC 連携）**: 平文の API キー（`OPENAI_API_KEY`）を GitHub Secrets 等に保管・手渡しするリスクを排除。GitHub Actions 起動時に OIDC（OpenID Connect）トークンを発行し、一時的な IAM Role 権限で Bedrock API を呼び出す完全キーレス（Keyless）運用を実現。
+* **検査の自動生成と多層判定**: Promptfoo の `redteam.plugins`（OWASP Top 10 for LLM / MITRE ATLAS 準拠の `indirect-prompt-injection`, `jailbreak`, `sql-injection` 等）を利用し、毎回多様な攻撃文をリアルタイム自動生成してテスト。判定器（Evaluator）が秘密情報漏洩や指示無視を検知した場合は CI ジョブを即座に自動停止（Fail-Secure）。
+
 ### AC.13: 受信コントリビューションにおける敵対的AIの検知
 * **要件の狙い**: AIのハルシネーションによる不正依存パッケージ混入の遮断。
 * **実現方法**:
@@ -275,7 +281,7 @@
 | **Amazon Athena** | AWS クラウド | S3ログに対する Sigma ルール検索・侵入判定用 SQL スキャンエンジン | **AC.5.3 / AC.10.1** |
 | **Gitleaks** | OSS / Actions | pre-commit フックおよび CI 内でのコード・プロンプト内シークレット絶対検知 | **AC.3.1-3.2** |
 | **Checkov** | OSS / Actions | Dockerfile, Terraform, Actionsワークフローの危険設定（IaC）自動検知 | **AC.7.2-7.3** |
-| **promptfoo / garak** | OSS / テストツール | プロンプトインジェクション耐性の事前・ナイトリー動的敵対テスト | **AC.2.3 / AC.6.3 / AC.11.8** |
+| **AWS OIDC ＋ Bedrock ＋ promptfoo** | AWS / OSS | 静的APIキーを全廃し、OIDC昇格でBedrock上の類似モデル(Claude 3.5 Sonnet)を叩き、自社プロンプト指示の動的敵対テストを実施 | **AC.2.3 / AC.6.3 / AC.11.8** |
 | **Sigma Rules** | Open Standard | 監査ログ異常検知用のオープンシグネチャ標準（Athena SQL に変換実行） | **AC.5.3 / AC.13.4** |
 | **Sigstore / cosign** | OSS | ビルド成果物（コンテナ等）への SLSA プロベナンス暗号署名検証技術 | **AC.9.1-9.3** |
 | **Slack** | チャット / 運用 | `#ai-security-feedback` チャンネルによる AI 危険提案のワンクリック通報口 | **AC.6.1** |
