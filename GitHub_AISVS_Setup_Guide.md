@@ -416,10 +416,18 @@ echo -e "\n\nCo-Authored-By: GitHub Copilot <copilot@github.com>" > ~/.gitmessag
 ```
 
 ### 6.2 Codespaces Secrets と Actions Secrets の分離管理 (AC.12.2)
-> **Settings** ➔ **Secrets and variables** ➔ **Codespaces**
+> **Settings** ➔ **Secrets and variables** ➔ **Codespaces** / **Actions**
 
-* **`Codespaces secrets` に置くべきもの**: 個人開発用 PAT、開発・検証用テストAPIキー（例: `sk_test_...`）のみ。
-* **`Actions secrets` に置くべきもの**: 本番AWS認証情報、デプロイ用特権鍵（Codespaces には絶対に共有・マウントしない）。
+AI エージェントや開発者がアクセスする Codespaces 環境には本番特権キーを絶対にマウントせず、開発・テスト用キーと本番デプロイキーを完全分離します。
+
+* **`Codespaces secrets` に置くべきもの（開発・検証用）**:
+  * `server`: `DATABASE_URL` (`file:./dev.db`), `JWT_SECRET` (`dev_jwt_secret_123`), `STRIPE_SECRET_KEY` (`sk_test_...`)
+  * `client`: `VITE_STRIPE_PUBLISHABLE_KEY` (`pk_test_...`), `VITE_API_URL` (`http://localhost:5000/api`)
+  * 個人開発用 PAT, テスト用ダミー API キー
+* **`Actions secrets` に置くべきもの（本番・CI/CD用）**:
+  * `server`: 本番 `DATABASE_URL` (RDS等), 本番 `JWT_SECRET`, 本番 Stripe ライブ秘密鍵 (`sk_live_...`)
+  * `client`: 本番 Stripe ライブ公開鍵 (`pk_live_...`), 本番 `VITE_API_URL`
+  * 本番 AWS IAM Role ARN (`AWS_ROLE_ARN`), Bedrock Guardrail ID (`BEDROCK_GUARDRAIL_ID`)
 
 ---
 
