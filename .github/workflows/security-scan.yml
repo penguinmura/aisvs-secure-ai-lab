@@ -109,8 +109,8 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
-          GUARDRAIL_ID: ${{ secrets.BEDROCK_GUARDRAIL_ID }}
-          GUARDRAIL_VERSION: "1"
+          GUARDRAIL_ID: ${{ vars.BEDROCK_GUARDRAIL_ID || secrets.BEDROCK_GUARDRAIL_ID }}
+          GUARDRAIL_VERSION: ${{ vars.BEDROCK_GUARDRAIL_VERSION || '1' }}
         run: |
           python - << 'EOF'
           import os, sys, subprocess
