@@ -28,9 +28,12 @@ jobs:
           echo "=== Extracting Live GitHub OIDC JWT Token ==="
           RESPONSE=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
           JWT=$(echo "$RESPONSE" | jq -r '.value')
-          echo "Raw Payload (Base64 decoded):"
-          echo "$JWT" | split -d. - | head -n 2 | tail -n 1 | base64 -d 2>/dev/null || true
-          echo ""
+          PAYLOAD=$(echo "$JWT" | cut -d. -f2)
+          mod=$((${#PAYLOAD} % 4))
+          if [ $mod -eq 2 ]; then PAYLOAD="${PAYLOAD}=="; fi
+          if [ $mod -eq 3 ]; then PAYLOAD="${PAYLOAD}="; fi
+          echo "Decoded Claims JSON:"
+          echo "$PAYLOAD" | base64 -d 2>/dev/null | jq .
 
       - name: Configure AWS Credentials via OIDC (Keyless)
         continue-on-error: true # AWS 準備前の初期検証時は警告を出してビルドを通過させる
