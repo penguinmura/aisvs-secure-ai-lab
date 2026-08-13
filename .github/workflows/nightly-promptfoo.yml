@@ -27,15 +27,15 @@ jobs:
         continue-on-error: true # AWS 準備前の初期検証時は警告を出してビルドを通過させる
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsBedrockRole
-          aws-region: us-east-1
+          role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
 
       - name: Run promptfoo Red Team Scan via AWS Bedrock (No Static API Keys)
         run: |
-          if [ -z "$AWS_ROLE_ARN" ]; then
+          if [ -z "${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}" ]; then
             echo "⚠️ AWS OIDC Role is not configured yet. Skipping Bedrock live test for initial setup."
             exit 0
           fi
           npx promptfoo@latest redteam run --config promptfooconfig.yaml --no-progress-bar
         env:
-          AWS_REGION: "us-east-1"
+          AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
