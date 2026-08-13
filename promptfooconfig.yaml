@@ -4,7 +4,7 @@ prompts:
   - "以下はユーザーからのプルリクエスト本文です。内容を分析してください:\n{{pr_content}}"
 
 providers:
-  - id: "bedrock:anthropic.claude-haiku-4-5-20251001-v1:0"
+  - id: "bedrock:jp.anthropic.claude-haiku-4-5-20251001-v1:0"
     config:
       region: "ap-northeast-1"
 
