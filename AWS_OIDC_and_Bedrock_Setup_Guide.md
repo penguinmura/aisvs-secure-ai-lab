@@ -66,10 +66,7 @@
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": [
-            "repo:<GITHUB_ORG_OR_USER>/<REPO_NAME>:ref:refs/heads/main",
-            "repo:<GITHUB_ORG_OR_USER>/<REPO_NAME>:pull_request"
-          ]
+          "token.actions.githubusercontent.com:sub": "repo:<GITHUB_ORG_OR_USER>*"
         }
       }
     }
@@ -77,17 +74,19 @@
 }
 ```
 
+> ⚠️ **ノウハウ (GitHub の `sub` フォーマット注意点)**: GitHub Actions の最新仕様では `sub` クレーム内に `repo:org@12345/repo@67890:ref:...` のように組織・リポジトリ ID (`@数値`) が挿入される場合があるため、`repo:<GITHUB_ORG_OR_USER>*` パターンで前方一致指定すると確実に通過します。
+
 ### 3.2 IAM ロールの作成
 1. **IAM ➔ ロール ➔ ロールを作成**
 2. **信頼されたエンティティタイプ**: `カスタム信頼ポリシー`
-3. 上記の JSON を貼り付けて作成（ロール名: `GitHubActionsBedrockRole`）。
-4. **Role ARN を取得** (例: `arn:aws:iam::123456789012:role/GitHubActionsBedrockRole`)
+3. 上記の JSON を貼り付けて作成（ロール名: `GitHubActionsBedrockOIDC` または `GitHubActionsBedrockRole`）。
+4. **Role ARN を取得** (例: `arn:aws:iam::123456789012:role/GitHubActionsBedrockOIDC`)
 
 ---
 
 ## 4. ステップ 3: 最小権限 IAM 許可ポリシーの追加 (Resource 制限)
 
-> 💡 **ハードニングポイント**: `Resource: "*"` を完全禁止。使用するモデル ARN と Guardrail ARN に限定し、他モデルの乱用や高額課金 (Denial of Wallet) 攻撃を防御します。
+> 💡 **ハードニングポイント**: `Resource: "*"` を完全禁止。使用するモデル ARN、推論プロファイル (Inference Profile)、および Guardrail ARN に限定し、他モデルの乱用や高額課金 (Denial of Wallet) 攻撃を防御します。
 
 ### 4.1 Bedrock 許可ポリシー JSON (`bedrock-policy.json`)
 ※ `<AWS_REGION>`, `<AWS_ACCOUNT_ID>`, `<GUARDRAIL_ID>` を置換してください。
@@ -104,8 +103,8 @@
         "bedrock:InvokeModelWithResponseStream"
       ],
       "Resource": [
-        "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0",
-        "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
+        "arn:aws:bedrock:*::foundation-model/*",
+        "arn:aws:bedrock:*:<AWS_ACCOUNT_ID>:inference-profile/*"
       ]
     },
     {
@@ -117,13 +116,22 @@
       "Resource": [
         "arn:aws:bedrock:<AWS_REGION>:<AWS_ACCOUNT_ID>:guardrail/<GUARDRAIL_ID>"
       ]
+    },
+    {
+      "Sid": "AWSMarketplaceSubscriptionAccess",
+      "Effect": "Allow",
+      "Action": [
+        "aws-marketplace:ViewSubscriptions",
+        "aws-marketplace:Subscribe"
+      ],
+      "Resource": "*"
     }
   ]
 }
 ```
 
 1. **IAM ➔ ポリシー ➔ ポリシーを作成** (名称: `GitHubActionsBedrockPolicy`)
-2. 上記 JSON を作成し、`GitHubActionsBedrockRole` にアタッチ。
+2. 上記 JSON を作成し、`GitHubActionsBedrockOIDC` にアタッチ。
 
 ---
 

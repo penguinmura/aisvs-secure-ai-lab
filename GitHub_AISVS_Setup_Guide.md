@@ -270,19 +270,20 @@ jobs:
       - name: Install AWS SDK
         run: pip install boto3
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials via OIDC (Keyless)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+          audience: sts.amazonaws.com
 
       - name: Run Bedrock Guardrail Scan
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
-          GUARDRAIL_ID: ${{ secrets.BEDROCK_GUARDRAIL_ID }}
-          GUARDRAIL_VERSION: "1"
+          GUARDRAIL_ID: ${{ vars.BEDROCK_GUARDRAIL_ID || secrets.BEDROCK_GUARDRAIL_ID }}
+          GUARDRAIL_VERSION: ${{ vars.BEDROCK_GUARDRAIL_VERSION || '1' }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
         run: |
           python - << 'EOF'
           import os, sys, boto3
@@ -291,13 +292,14 @@ jobs:
           pr_body = os.environ.get('PR_BODY', '')
           guardrail_id = os.environ.get('GUARDRAIL_ID')
           guardrail_version = os.environ.get('GUARDRAIL_VERSION', '1')
+          region = os.environ.get('AWS_REGION', 'ap-northeast-1')
 
           text_to_check = f"{pr_title}\n{pr_body}"
           if not text_to_check.strip() or not guardrail_id:
               print("No input or Guardrail ID missing. Skipping.")
               sys.exit(0)
 
-          client = boto3.client('bedrock-runtime', region_name='us-east-1')
+          client = boto3.client('bedrock-runtime', region_name=region)
           response = client.apply_guardrail(
               guardrailIdentifier=guardrail_id,
               guardrailVersion=guardrail_version,
@@ -363,6 +365,10 @@ on:
     - cron: '0 2 * * *' # 毎日午前2時実行
   workflow_dispatch:
 
+permissions:
+  id-token: write # AWS OIDC 昇格用権限
+  contents: read
+
 jobs:
   promptfoo-test:
     runs-on: ubuntu-latest
@@ -375,13 +381,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
-      - name: Run promptfoo Red Team Scan
+      - name: Configure AWS Credentials via OIDC (Keyless)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+          audience: sts.amazonaws.com
+
+      - name: Run promptfoo Red Team Scan via AWS Bedrock (No Static API Keys)
         run: |
-          npx promptfoo@latest redteam run --no-progress-bar
+          npx promptfoo@latest redteam run --config promptfooconfig.yaml --no-progress-bar
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
 ```
 
 ---
