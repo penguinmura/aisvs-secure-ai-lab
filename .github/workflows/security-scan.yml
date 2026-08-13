@@ -102,8 +102,9 @@ jobs:
         continue-on-error: true # AWS Secrets 未設定時は警告を出してテスト通過させる
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsBedrockRole
-          aws-region: us-east-1
+          role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+          audience: sts.amazonaws.com
 
       - name: Run Fail-Secure Bedrock Guardrail Scan (Title, Body & Diff)
         env:
