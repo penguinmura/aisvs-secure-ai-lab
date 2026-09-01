@@ -1,17 +1,21 @@
-name: "Nightly Promptfoo Adversarial Test"
+name: Nightly Promptfoo Adversarial Test
 
 on:
   schedule:
-    - cron: '0 2 * * *' # 毎日午前2時実行
+    # GitHub ActionsのcronはUTC。
+    # JSTの午前2時に実行する場合は、前日の17:00 UTC。
+    - cron: "0 17 * * *"
   workflow_dispatch:
 
 permissions:
-  id-token: write # AWS OIDC 昇格用権限
+  id-token: write
   contents: read
 
 jobs:
   promptfoo-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 180
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,34 +25,36 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
 
-      - name: Debug OIDC Token Claims
+      - name: Check AWS role configuration
+        env:
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
         run: |
-          echo "=== Extracting Live GitHub OIDC JWT Token ==="
-          RESPONSE=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
-          JWT=$(echo "$RESPONSE" | jq -r '.value')
-          PAYLOAD=$(echo "$JWT" | cut -d. -f2)
-          mod=$((${#PAYLOAD} % 4))
-          if [ $mod -eq 2 ]; then PAYLOAD="${PAYLOAD}=="; fi
-          if [ $mod -eq 3 ]; then PAYLOAD="${PAYLOAD}="; fi
-          echo "Decoded Claims JSON:"
-          echo "$PAYLOAD" | base64 -d 2>/dev/null | jq .
+          if [ -z "$AWS_ROLE_ARN" ]; then
+            echo "::error::AWS_ROLE_ARN is not configured."
+            exit 1
+          fi
 
-      - name: Configure AWS Credentials via OIDC (Keyless)
-        continue-on-error: true # AWS 準備前の初期検証時は警告を出してビルドを通過させる
+      - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
           audience: sts.amazonaws.com
+          role-session-name: promptfoo-nightly
+          role-duration-seconds: 10800
 
-      - name: Run promptfoo Red Team Scan via AWS Bedrock (No Static API Keys)
+      - name: Verify AWS credentials
         run: |
-          if [ -z "${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}" ]; then
-            echo "⚠️ AWS OIDC Role is not configured yet. Skipping Bedrock live test for initial setup."
-            exit 0
-          fi
-          npx promptfoo@latest redteam run --config promptfooconfig.yaml --no-progress-bar
+          aws sts get-caller-identity
+          aws configure list
+
+      - name: Run Promptfoo Red Team Scan via AWS Bedrock
         env:
           AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+          AWS_DEFAULT_REGION: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+        run: |
+          npx promptfoo@latest redteam run \
+            --config promptfooconfig.yaml \
+            --no-progress-bar
